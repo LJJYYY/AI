@@ -1,1 +1,1 @@
-SHA256  cd48b04c614befc0765cb655fafe502598fe407f6b6139d56d363821a57c552c  PrintMaterialStudio-source.zip
+SHA256  ee2b019e7fb9e24d43d234aa120a98cfe61773ae4ea596e63c52bf4f2271f107  PrintMaterialStudio-source.zip
