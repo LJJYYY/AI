@@ -1,0 +1,58 @@
+name: Windows desktop
+
+on:
+  push:
+    branches: [delivery/print-studio-recovery]
+    paths:
+      - 'PrintMaterialStudio-source.zip'
+      - '.github/workflows/windows-desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Extract source package
+        shell: pwsh
+        run: Expand-Archive -LiteralPath PrintMaterialStudio-source.zip -DestinationPath source
+      - name: Install build requirements
+        working-directory: source
+        run: python -m pip install -r requirements-desktop.txt
+      - name: Test application
+        working-directory: source
+        run: python -m unittest discover -s tests -q
+      - name: Build Windows executable
+        working-directory: source
+        run: python -m PyInstaller --noconfirm PrintMaterialStudio.spec
+      - name: Test actual executable
+        working-directory: source
+        run: python scripts/check_desktop_binary.py dist/PrintMaterialStudio.exe
+      - name: Package desktop app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path desktop | Out-Null
+          Copy-Item source/dist/PrintMaterialStudio.exe desktop/
+          Copy-Item source/docs/windows-desktop.md desktop/README.md
+          Compress-Archive -Path desktop/* -DestinationPath PrintMaterialStudio-Windows-x64.zip
+          (Get-FileHash PrintMaterialStudio-Windows-x64.zip -Algorithm SHA256).Hash.ToLower() + '  PrintMaterialStudio-Windows-x64.zip' | Set-Content -Encoding ascii SHA256-desktop.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PrintMaterialStudio-Windows-x64
+          path: |
+            PrintMaterialStudio-Windows-x64.zip
+            SHA256-desktop.txt
+      - name: Publish download after successful executable checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = 'desktop-${{ github.run_number }}-${{ github.sha }}'
+          gh release create $tag PrintMaterialStudio-Windows-x64.zip SHA256-desktop.txt --target '${{ github.sha }}' --title 'Windows desktop ${{ github.run_number }}' --notes 'Double-click PrintMaterialStudio.exe. Includes Python and image libraries. Windows executable startup, port conflict, duplicate launch and shutdown checks passed.'
